@@ -56,6 +56,11 @@ function exec_as() {
 
 trap "log -e 'Installation failed!'" ERR
 
+# Here are the environment variables that will be used in our build.
+export GVM_INSTALL_PREFIX="opt/gvm"
+export GVM_VERSION="21.04"
+export GVM_ADMIN_PWD="admin"
+
 require GVM_INSTALL_PREFIX
 require GVM_VERSION
 require GVM_ADMIN_PWD
@@ -156,6 +161,8 @@ function clone_sources() {
     || (cd gvm-libs; git pull --all; git checkout "gvm-libs-$GVM_VERSION"; git pull; cd ..)
   git clone -b "openvas-$GVM_VERSION" https://github.com/greenbone/openvas.git \
     || (cd openvas; git pull --all; git checkout "openvas-$GVM_VERSION"; git pull; cd ..)
+  git clone -b master --single-branch https://github.com/greenbone/openvas-smb.git \
+    || (cd openvas-smb; git pull; cd ..)
   git clone -b "gvmd-$GVM_VERSION" https://github.com/greenbone/gvmd.git \
     || (cd gvmd; git pull --all; git checkout "gvmd-$GVM_VERSION"; git pull; cd ..)
   git clone -b "ospd-openvas-$GVM_VERSION" https://github.com/greenbone/ospd-openvas.git \
@@ -175,6 +182,19 @@ function install_gvm_libs() {
   cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" ..
   make -j$(nproc)
   make doc
+  make install
+}
+
+# This function will install openvas_smb
+function install_openvas_smb() {
+  set -e
+  export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
+  cd ~/src/openvas-smb
+  mkdir -p build
+  cd build
+  rm -rf *
+  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" ..
+  make -j$(nproc)
   make install
 }
 
@@ -212,9 +232,9 @@ function edit_sudoers() {
   fi
   echo "gvm ALL = NOPASSWD: $GVM_INSTALL_PREFIX/sbin/openvas" > /etc/sudoers.d/gvm
   echo "gvm ALL = NOPASSWD: $GVM_INSTALL_PREFIX/sbin/gsad" >> /etc/sudoers.d/gvm
-  echo "gvm ALL = NOPASSWD: /bin/systemctl stop ipsec.service" >> /etc/sudoers.d/gvm
-  echo "gvm ALL = NOPASSWD: /bin/systemctl restart ipsec.service" >> /etc/sudoers.d/gvm
-  echo "gvm ALL = NOPASSWD: /bin/systemctl start ipsec.service" >> /etc/sudoers.d/gvm
+  # echo "gvm ALL = NOPASSWD: /bin/systemctl stop ipsec.service" >> /etc/sudoers.d/gvm
+  # echo "gvm ALL = NOPASSWD: /bin/systemctl restart ipsec.service" >> /etc/sudoers.d/gvm
+  # echo "gvm ALL = NOPASSWD: /bin/systemctl start ipsec.service" >> /etc/sudoers.d/gvm
   chmod 440 /etc/sudoers.d/gvm
 }
 
@@ -236,16 +256,16 @@ function install_gvmd() {
 function setup_postgres() {
   set -e
   psql postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='gvm'" | grep -q 1 \
-      || createuser -DRS gvm
+    || createuser -DRS gvm
   psql -lqt | cut -d '|' -f 1 | grep -qw gvmd \
-      || createdb -O gvm gvmd
+    || createdb -O gvm gvmd
   psql gvmd -c 'create role dba with superuser noinherit;' \
-      2>&1 | grep -e 'already exists' -e 'CREATE ROLE'
+    2>&1 | grep -e 'already exists' -e 'CREATE ROLE'
   psql gvmd -c 'grant dba to gvm;'
   psql gvmd -c 'create extension "uuid-ossp";' \
-      2>&1 | grep -e 'already exists' -e 'CREATE EXTENSION'
+    2>&1 | grep -e 'already exists' -e 'CREATE EXTENSION'
   psql gvmd -c 'create extension "pgcrypto";' \
-      2>&1 | grep -e 'already exists' -e 'CREATE EXTENSION'
+    2>&1 | grep -e 'already exists' -e 'CREATE EXTENSION'
 }
 
 function setup_gvmd() {
@@ -395,6 +415,8 @@ log -i "Clone gvm repos into src directory"
 exec_as gvm clone_sources GVM_VERSION
 log -i "Install gvm-libs"
 exec_as gvm install_gvm_libs PKG_CONFIG_PATH GVM_INSTALL_PREFIX
+log -i "Install openvas-smb"
+exec_as gvm install_openvas_smb PKG_CONFIG_PATH GVM_INSTALL_PREFIX
 log -i "Install openvas"
 exec_as gvm install_openvas PKG_CONFIG_PATH GVM_INSTALL_PREFIX
 # Make ourselves root starting here.
