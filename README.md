@@ -15,7 +15,7 @@ First set your environment variables that are to be used in the bash script by m
 - When installing the NVTs, SCAP, and CERT data. This will be the biggest batch of data that will need to be stored so you will need up to 10-15 GiB of data.
 
 ## IMPORTANT
-My bash script does not install `gsa` (allows one to interface with the website of OpenVAS Scanner. If you would like to have it installed with the other modules that support the web interface, please look toward my acknolwedgements with the link. What I did was add a tool that Greenbone provides called `gvm-tools`.
+My bash script does not install `gsa` (allows one to interface with the website of OpenVAS Scanner). If you would like to have it installed with the other modules that support the web interface, please look toward my acknolwedgements with the link. What I did was add a tool that Greenbone provides called `gvm-tools`.
 - This tool allows one to interact without the need of GSA and do scans through API actions using `xml` code. Here is their documentation on how to use [gvm-tools](https://docs.greenbone.net/GSM-Manual/gos-5/en/gmp.html)
 - An important issue that has conflicted with Debian 10/Ubuntu 20.04 services is whenever you scan a target, OpenVAS Scanner will give you 0.0 Severity Log. To fix this issue, please follow this [link](https://community.greenbone.net/t/scan-severity-0-0-log/9554/3). (Since GSA is not installed we cannot interact with the "Custom Config" so I will see about creating a custom config on my side for this to work.)
 
