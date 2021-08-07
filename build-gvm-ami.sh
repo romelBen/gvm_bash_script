@@ -57,7 +57,7 @@ function exec_as() {
 trap "log -e 'Installation failed!'" ERR
 
 # Here are the environment variables that will be used in our build.
-export GVM_INSTALL_PREFIX="opt/gvm"
+export GVM_INSTALL_PREFIX="/opt/gvm"
 export GVM_VERSION="21.04"
 export GVM_ADMIN_PWD="admin"
 
