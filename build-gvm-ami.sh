@@ -108,6 +108,14 @@ function install_deps() {
   apt-get install -yq yarn
 }
 
+# This will import the Greenbone Signing Key to verify our builds
+# function import_greenbone_gpg() {
+#   curl -O https://www.greenbone.net/GBCommunitySigningKey.asc
+#   gpg --import GBCommunitySigningKey.asc
+
+#   echo -e "trust\n5\ny" > trust_key.cmd gpg --command-file trust_key.cmd --edit-key 9823FAA60ED1E580
+# }
+
 # This function will set up the gvm user for our system, the path, and the directory of our environment variable.
 function setup_user() {
   set -e
