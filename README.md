@@ -1,5 +1,5 @@
 # Greenbone Vulnerability Management (GVM) Bash Script
-This installs Greenbone Vulnerability Management (GVM) for Debian/Ubuntu services. This does NOT work for Docker. Please bare that in mind it works for VMs and bare metal deployments. For documentation on how to install GVM 21.04, please follow Greenbone's process (here)[https://greenbone.github.io/docs/gvm-21.04/index.html].
+This installs Greenbone Vulnerability Management (GVM) for Debian/Ubuntu services. This does NOT work for Docker. Please bare that in mind it works for VMs and bare metal deployments. For documentation on how to install GVM 21.04, please follow Greenbone's process [here](https://greenbone.github.io/docs/gvm-21.04/index.html).
 
 ## Installation Configurements
 First set your environment variables that are to be used in the bash script by modifying the following variables:
