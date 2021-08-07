@@ -9,8 +9,8 @@ First set your environment variables that are to be used in the bash script by m
 
 ## Requirements
 - Installation works on these distros:
-- - Debian 10
-- - Ubuntu 20.04
+  - Debian 10
+  - Ubuntu 20.04
 - Have `sudo` installed since you will need to switch between `gvm` and `root` users for the installation process.
 - When installing the NVTs, SCAP, and CERT data. This will be the biggest batch of data that will need to be stored so you will need up to 10-15 GiB of data.
 
