@@ -87,7 +87,7 @@ function update_system() {
 function install_deps() {
   set -e
   apt-get install -yq \
-    bison cmake curl doxygen fakeroot gcc g++ \
+    bison cmake curl doxygen fakeroot gcc g++ build-essential \
     gcc-mingw-w64 gettext git gnupg gnutls-bin \
     graphviz heimdal-dev libgcrypt20-dev libglib2.0-dev \
     libgnutls28-dev libgpgme-dev libhiredis-dev \
@@ -160,29 +160,43 @@ EOF
   systemctl enable --now disable-thp
 }
 
-# This function will send git clones of gvm-libs, openvas, ospd, ospd-openvas, and gvmd to
-# directory ~/src.
+# # This function will send git clones of gvm-libs, openvas, ospd, ospd-openvas, and gvmd to
+# # directory ~/src.
+# function clone_sources() {
+#   set -e
+#   cd ~/src
+#   git clone -b "gvm-libs-$GVM_VERSION" https://github.com/greenbone/gvm-libs.git \
+#     || (cd gvm-libs; git pull --all; git checkout "gvm-libs-$GVM_VERSION"; git pull; cd ..)
+#   git clone -b "openvas-$GVM_VERSION" https://github.com/greenbone/openvas.git \
+#     || (cd openvas; git pull --all; git checkout "openvas-$GVM_VERSION"; git pull; cd ..)
+#   git clone -b master --single-branch https://github.com/greenbone/openvas-smb.git \
+#     || (cd openvas-smb; git pull; cd ..)
+#   git clone -b "gvmd-$GVM_VERSION" https://github.com/greenbone/gvmd.git \
+#     || (cd gvmd; git pull --all; git checkout "gvmd-$GVM_VERSION"; git pull; cd ..)
+#   git clone -b "ospd-openvas-$GVM_VERSION" https://github.com/greenbone/ospd-openvas.git \
+#     || (cd ospd-openvas; git pull --all; git checkout "ospd-openvas-$GVM_VERSION"; git pull; cd ..)
+#   git clone -b "ospd-$GVM_VERSION" https://github.com/greenbone/ospd.git \
+#     || (cd ospd; git pull --all; git checkout "ospd-$GVM_VERSION"; git pull; cd ..)
+# }
+
+# This function will use download the tar files to extract and confirm with the gpg key if the signature is correct.
 function clone_sources() {
   set -e
   cd ~/src
-  git clone -b "gvm-libs-$GVM_VERSION" https://github.com/greenbone/gvm-libs.git \
-    || (cd gvm-libs; git pull --all; git checkout "gvm-libs-$GVM_VERSION"; git pull; cd ..)
-  git clone -b "openvas-$GVM_VERSION" https://github.com/greenbone/openvas.git \
-    || (cd openvas; git pull --all; git checkout "openvas-$GVM_VERSION"; git pull; cd ..)
-  git clone -b master --single-branch https://github.com/greenbone/openvas-smb.git \
-    || (cd openvas-smb; git pull; cd ..)
-  git clone -b "gvmd-$GVM_VERSION" https://github.com/greenbone/gvmd.git \
-    || (cd gvmd; git pull --all; git checkout "gvmd-$GVM_VERSION"; git pull; cd ..)
-  git clone -b "ospd-openvas-$GVM_VERSION" https://github.com/greenbone/ospd-openvas.git \
-    || (cd ospd-openvas; git pull --all; git checkout "ospd-openvas-$GVM_VERSION"; git pull; cd ..)
-  git clone -b "ospd-$GVM_VERSION" https://github.com/greenbone/ospd.git \
-    || (cd ospd; git pull --all; git checkout "ospd-$GVM_VERSION"; git pull; cd ..)
+
+  if [[ gpg --verify ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz | grep "Good signature from 'Greenbone Community Feed integrity key'" ]]; then
+    curl -f -L https://github.com/greenbone/gvm-libs/archive/refs/tags/v$GVM_INSTALL_PREFIX.tar.gz -o ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz
+    curl -f -L https://github.com/greenbone/gvm-libs/releases/download/v$GVM_INSTALL_PREFIX/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc -o ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc
+  fi
+
+
 }
 
 # This function will install gvm_libs
 function install_gvm_libs() {
   set -e
   export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
+  tar -C ~/src -xvzf ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz
   cd ~/src/gvm-libs
   mkdir -p build
   cd build
