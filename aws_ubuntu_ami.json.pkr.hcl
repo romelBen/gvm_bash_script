@@ -13,16 +13,16 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
-### VPC and subnet information are for Infra environment ###
-variable "vpc" {
-  type    = string
-  default = ""
-}
+# ### VPC and subnet information are for Infra environment ###
+# variable "vpc" {
+#   type    = string
+#   default = ""
+# }
 
-variable "subnet" {
-  type    = string
-  default = ""
-}
+# variable "subnet" {
+#   type    = string
+#   default = ""
+# }
 
 # The amazon-ami data block is generated from your amazon builder source_ami_filter; a data
 # from this block can be referenced in source and locals blocks.
@@ -37,7 +37,7 @@ data "amazon-ami" "ubuntu_image" {
     virtualization-type = "hvm"
   }
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"]
   region      = "${var.aws_region}"
 }
 
@@ -47,16 +47,18 @@ data "amazon-ami" "ubuntu_image" {
 source "amazon-ebs" "ubuntu_ami_builder" {
   ami_name                    = "${var.ami_name}"
   associate_public_ip_address = "true"
-  iam_instance_profile        = "get_ec2_role"
+  # iam_instance_profile        = ""
   instance_type               = "t3a.medium"
   encrypt_boot                = "true"
+  # vpc_id = "${var.vpc}"
+  # subnet_id    = "${var.subnet}"
+  region = "${var.aws_region}"
   launch_block_device_mappings {
     delete_on_termination = "true"
     device_name           = "/dev/sda1"
     volume_size           = "15"
     volume_type           = "gp2"
   }
-  region = "${var.aws_region}"
   run_tags = {
     Environment = "development"
     Name        = "${var.ami_name}"
@@ -69,11 +71,9 @@ source "amazon-ebs" "ubuntu_ami_builder" {
   }
   source_ami   = "${data.amazon-ami.ubuntu_image.id}"
   ssh_username = "ubuntu"
-  # subnet_id    = "${var.subnet}"
   tags = {
     Name = "${var.ami_name}"
   }
-  # vpc_id = "${var.vpc}"
 }
 
 # The build block invokes sources and runs provisioning steps on them. The
@@ -84,6 +84,6 @@ build {
 
   provisioner "shell" {
     execute_command   = "echo 'packer' | sudo -S env {{ .Vars }} {{ .Path }}"
-    script            = "ubuntu_build.sh"
+    script            = "build-gvm-ami.sh"
   }
 }

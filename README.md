@@ -7,6 +7,10 @@ First set your environment variables that are to be used in the bash script by m
 - `GVM_VERSIONS`: The GVM version to install (default = 21.04)
 - `GVM_ADMIN_PWD`: The initial admin password. (please change the password...BIG security risk) (default = admin)
 
+## Installation and Testing Procedure
+- For installation purposes, go to the directory and run `./build-gvm-ami.sh` in your VM or server.
+- For testing purposes, I currently use Packer (HCL2) to create the image in AWS which will then build the AMI once successful. Please change the settings to what you want. To build in your own account in AWS, go ahead and first setup by installing `awscli` and then execute `aws configure` (where it will ask for you to enter your `secret key` and `secret access key`). Once this is done, run `packer build aws_ubuntu_ami.json.pkr.hcl` and Packer will begin to build the AMI in your environment.
+
 ## Requirements
 - Installation works on these distros:
   - Debian 10
