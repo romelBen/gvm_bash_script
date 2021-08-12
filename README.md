@@ -29,9 +29,8 @@ If anyone wants to help please let me know in GitHub. I will be glad to have sup
 
 ## To-Dos
 - [x] Will install `openvas-smb` because why not.
-- [ ] Need to fix PATHing in my current bash script since this is causing a `Permission denied` error.
+- [x] Need to fix PATHing in my current bash script since this is causing a `Permission denied` error.
 - [ ] Going to create python scripts that will be incorporating the full scans into my bash script so this can be ran separately when you want to scan a target using API actions.
-- [ ] Will continue testing the instance periodically so others can use my code :)
 
 ## Acknowledgements
 Great inspiration of this script comes from [Jarthianur](https://github.com/Jarthianur/gvm-install-script) for his work on the GVM script. I modified the code with modifications to be shared for all and will add several sections that would help others.
