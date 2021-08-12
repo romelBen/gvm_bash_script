@@ -57,6 +57,10 @@ function exec_as() {
 trap "log -e 'Installation failed!'" ERR
 
 # Here are the environment variables that will be used in our build.
+export DEBIAN_FRONTEND=noninteractive
+export AS_ROOT="sudo bash -c"
+export AS_GVM="sudo -u gvm bash -c"
+
 export GVM_INSTALL_PREFIX="/opt/gvm"
 export GVM_VERSION="21.04"
 export GVM_ADMIN_PWD="admin"
@@ -160,48 +164,50 @@ EOF
   systemctl enable --now disable-thp
 }
 
-# # This function will send git clones of gvm-libs, openvas, ospd, ospd-openvas, and gvmd to
-# # directory ~/src.
-# function clone_sources() {
-#   set -e
-#   cd ~/src
-#   git clone -b "gvm-libs-$GVM_VERSION" https://github.com/greenbone/gvm-libs.git \
-#     || (cd gvm-libs; git pull --all; git checkout "gvm-libs-$GVM_VERSION"; git pull; cd ..)
-#   git clone -b "openvas-$GVM_VERSION" https://github.com/greenbone/openvas.git \
-#     || (cd openvas; git pull --all; git checkout "openvas-$GVM_VERSION"; git pull; cd ..)
-#   git clone -b master --single-branch https://github.com/greenbone/openvas-smb.git \
-#     || (cd openvas-smb; git pull; cd ..)
-#   git clone -b "gvmd-$GVM_VERSION" https://github.com/greenbone/gvmd.git \
-#     || (cd gvmd; git pull --all; git checkout "gvmd-$GVM_VERSION"; git pull; cd ..)
-#   git clone -b "ospd-openvas-$GVM_VERSION" https://github.com/greenbone/ospd-openvas.git \
-#     || (cd ospd-openvas; git pull --all; git checkout "ospd-openvas-$GVM_VERSION"; git pull; cd ..)
-#   git clone -b "ospd-$GVM_VERSION" https://github.com/greenbone/ospd.git \
-#     || (cd ospd; git pull --all; git checkout "ospd-$GVM_VERSION"; git pull; cd ..)
-# }
-
-# This function will use download the tar files to extract and confirm with the gpg key if the signature is correct.
+# This function will send git clones of gvm-libs, openvas, ospd, ospd-openvas, and gvmd to
+# directory ~/src.
 function clone_sources() {
   set -e
   cd ~/src
+  git clone -b "gvm-libs-$GVM_VERSION" https://github.com/greenbone/gvm-libs.git \
+    || (cd gvm-libs; git pull --all; git checkout "gvm-libs-$GVM_VERSION"; git pull; cd ..)
+  git clone -b "openvas-$GVM_VERSION" https://github.com/greenbone/openvas.git \
+    || (cd openvas; git pull --all; git checkout "openvas-$GVM_VERSION"; git pull; cd ..)
+  git clone -b master --single-branch https://github.com/greenbone/openvas-smb.git \
+    || (cd openvas-smb; git pull; cd ..)
+  git clone -b "gvmd-$GVM_VERSION" https://github.com/greenbone/gvmd.git \
+    || (cd gvmd; git pull --all; git checkout "gvmd-$GVM_VERSION"; git pull; cd ..)
+  git clone -b "ospd-openvas-$GVM_VERSION" https://github.com/greenbone/ospd-openvas.git \
+    || (cd ospd-openvas; git pull --all; git checkout "ospd-openvas-$GVM_VERSION"; git pull; cd ..)
+  git clone -b "ospd-$GVM_VERSION" https://github.com/greenbone/ospd.git \
+    || (cd ospd; git pull --all; git checkout "ospd-$GVM_VERSION"; git pull; cd ..)
+} 
 
-  if [[ gpg --verify ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz | grep "Good signature from 'Greenbone Community Feed integrity key'" ]]; then
-    curl -f -L https://github.com/greenbone/gvm-libs/archive/refs/tags/v$GVM_INSTALL_PREFIX.tar.gz -o ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz
-    curl -f -L https://github.com/greenbone/gvm-libs/releases/download/v$GVM_INSTALL_PREFIX/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc -o ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc
-  fi
+# # This function will use download the tar files to extract and confirm with the gpg key if the signature is correct.
+# function clone_sources() {
+#   set -e
+#   cd ~/src
 
+#   if [[ gpg --verify ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz | grep "Good signature from 'Greenbone Community Feed integrity key'" ]]; then
+#     curl -f -L https://github.com/greenbone/gvm-libs/archive/refs/tags/v$GVM_INSTALL_PREFIX.tar.gz -o ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz
+#     curl -f -L https://github.com/greenbone/gvm-libs/releases/download/v$GVM_INSTALL_PREFIX/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc -o ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz.asc
+#   fi
 
-}
+# }
 
 # This function will install gvm_libs
 function install_gvm_libs() {
   set -e
   export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
-  tar -C ~/src -xvzf ~/src/gvm-libs-$GVM_INSTALL_PREFIX.tar.gz
   cd ~/src/gvm-libs
   mkdir -p build
   cd build
   rm -rf *
-  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" ..
+  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
+        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
+        -DGVM_PID_DIR="$GVM_INSTALL_PREFIX"/var/run ..
   make -j$(nproc)
   make doc
   make install
@@ -215,7 +221,12 @@ function install_openvas_smb() {
   mkdir -p build
   cd build
   rm -rf *
-  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" ..
+  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
+        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
+        -DGVM_RUN_DIR="$GVM_INSTALL_PREFIX"/var/run \
+        -DGSAD_PID_DIR="$GVM_INSTALL_PREFIX"/var/run ..
   make -j$(nproc)
   make install
 }
@@ -228,7 +239,12 @@ function install_openvas() {
   mkdir -p build
   cd build
   rm -rf *
-  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" ..
+  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
+        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
+        -DOPENVAS_RUN_DIR="$GVM_INSTALL_PREFIX"/var/run/ospd \
+        -DOPENVAS_FEED_LOCK_PATH="$GVM_INSTALL_PREFIX"/var/run/ospd/feed-update.lock ..
   make -j$(nproc)
   make doc
   make install
@@ -268,7 +284,14 @@ function install_gvmd() {
   mkdir -p build
   cd build
   rm -rf *
-  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" -DSYSTEMD_SERVICE_DIR="$GVM_INSTALL_PREFIX" ..
+  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
+        -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
+        -DGVM_RUN_DIR="$GVM_INSTALL_PREFIX"/var/run \
+        -DOPENVAS_DEFAULT_SOCKET="$GVM_INSTALL_PREFIX"/var/run/ospd/ospd.sock \
+        -DGVM_FEED_LOCK_PATH="$GVM_INSTALL_PREFIX"/var/run/feed-update.lock \
+        -DSYSTEMD_SERVICE_DIR="$GVM_INSTALL_PREFIX"/lib/systemd/system ..
   make -j$(nproc)
   make doc
   make install
