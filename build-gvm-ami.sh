@@ -222,11 +222,7 @@ function install_openvas_smb() {
   cd build
   rm -rf *
   cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
-        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
-        -DGVM_RUN_DIR="$GVM_INSTALL_PREFIX"/var/run \
-        -DGSAD_PID_DIR="$GVM_INSTALL_PREFIX"/var/run ..
+        -DCMAKE_BUILD_TYPE=Release ..
   make -j$(nproc)
   make install
 }
@@ -243,8 +239,8 @@ function install_openvas() {
         -DCMAKE_BUILD_TYPE=Release \
         -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
         -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
-        -DOPENVAS_RUN_DIR="$GVM_INSTALL_PREFIX"/var/run/ospd \
-        -DOPENVAS_FEED_LOCK_PATH="$GVM_INSTALL_PREFIX"/var/run/ospd/feed-update.lock ..
+        -DOPENVAS_RUN_DIR="$GVM_INSTALL_PREFIX"/var/run \
+        -DOPENVAS_FEED_LOCK_PATH="$GVM_INSTALL_PREFIX"/var/run/feed-update.lock ..
   make -j$(nproc)
   make doc
   make install
