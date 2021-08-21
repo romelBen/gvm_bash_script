@@ -204,10 +204,8 @@ function install_gvm_libs() {
   cd build
   rm -rf *
   cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
-        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
-        -DGVM_PID_DIR="$GVM_INSTALL_PREFIX"/var/run ..
+        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX/var" \
+        -DSYSCONFDIR="$GVM_INSTALL_PREFIX/etc" ..
   make -j$(nproc)
   make doc
   make install
@@ -221,8 +219,7 @@ function install_openvas_smb() {
   mkdir -p build
   cd build
   rm -rf *
-  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
-        -DCMAKE_BUILD_TYPE=Release ..
+  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX"
   make -j$(nproc)
   make install
 }
@@ -236,11 +233,8 @@ function install_openvas() {
   cd build
   rm -rf *
   cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
-        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
-        -DOPENVAS_RUN_DIR="$GVM_INSTALL_PREFIX"/var/run \
-        -DOPENVAS_FEED_LOCK_PATH="$GVM_INSTALL_PREFIX"/var/run/feed-update.lock ..
+        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX/var" \
+        -DSYSCONFDIR="$GVM_INSTALL_PREFIX/etc" ..
   make -j$(nproc)
   make doc
   make install
@@ -266,9 +260,6 @@ function edit_sudoers() {
   fi
   echo "gvm ALL = NOPASSWD: $GVM_INSTALL_PREFIX/sbin/openvas" > /etc/sudoers.d/gvm
   echo "gvm ALL = NOPASSWD: $GVM_INSTALL_PREFIX/sbin/gsad" >> /etc/sudoers.d/gvm
-  # echo "gvm ALL = NOPASSWD: /bin/systemctl stop ipsec.service" >> /etc/sudoers.d/gvm
-  # echo "gvm ALL = NOPASSWD: /bin/systemctl restart ipsec.service" >> /etc/sudoers.d/gvm
-  # echo "gvm ALL = NOPASSWD: /bin/systemctl start ipsec.service" >> /etc/sudoers.d/gvm
   chmod 440 /etc/sudoers.d/gvm
 }
 
@@ -281,13 +272,9 @@ function install_gvmd() {
   cd build
   rm -rf *
   cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX"/var \
-        -DSYSCONFDIR="$GVM_INSTALL_PREFIX"/etc \
-        -DGVM_RUN_DIR="$GVM_INSTALL_PREFIX"/var/run \
-        -DOPENVAS_DEFAULT_SOCKET="$GVM_INSTALL_PREFIX"/var/run/ospd/ospd.sock \
-        -DGVM_FEED_LOCK_PATH="$GVM_INSTALL_PREFIX"/var/run/feed-update.lock \
-        -DSYSTEMD_SERVICE_DIR="$GVM_INSTALL_PREFIX"/lib/systemd/system ..
+        -DSYSTEMD_SERVICE_DIR="$GVM_INSTALL_PREFIX" \
+        -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX/var" \
+        -DSYSCONFDIR="$GVM_INSTALL_PREFIX/etc" ..
   make -j$(nproc)
   make doc
   make install
@@ -329,7 +316,7 @@ function install_ospd_openvas() {
     virtualenv --python python3 "$GVM_INSTALL_PREFIX/bin/ospd-scanner/"
   fi
   . "$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/activate"
-  mkdir -p "$GVM_INSTALL_PREFIX/var/run/ospd/"
+  python3 -m pip install --upgrade pip
   cd ospd
   pip3 install .
   cd ../ospd-openvas/
@@ -354,17 +341,15 @@ After=postgresql.service ospd-openvas.service
 Type=forking
 User=gvm
 Group=gvm
-PIDFile=$GVM_INSTALL_PREFIX/var/run/gvmd.pid
-WorkingDirectory=$GVM_INSTALL_PREFIX
-ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=$GVM_INSTALL_PREFIX/var/run/ospd.sock -c $GVM_INSTALL_PREFIX/var/run/gvmd.sock
+PIDFile=/run/gvm/gvmd.pid
+RuntimeDirectory=gvm
+RuntimeDirectoryMode=0750
+PermissionStartOnly=True
+ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd.sock -c /run/gvm/gvmd.sock
 ExecReload=/bin/kill -HUP \$MAINPID
 KillMode=mixed
 Restart=on-failure
 RestartSec=2min
-KillMode=process
-KillSignal=SIGINT
-GuessMainPID=no
-PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -380,21 +365,20 @@ function create_openvas_service() {
 [Unit]
 Description=Job that runs the ospd-openvas daemon
 Documentation=man:gvm
-After=network.target redis-server@openvas.service
+After=network.target networking.service redis-server@openvas.service
 Wants=redis-server@openvas.service
 [Service]
 Environment=PATH=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin:$GVM_INSTALL_PREFIX/bin:$GVM_INSTALL_PREFIX/sbin:$GVM_INSTALL_PREFIX/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Type=forking
 User=gvm
 Group=gvm
-WorkingDirectory=$GVM_INSTALL_PREFIX
-PIDFile=$GVM_INSTALL_PREFIX/var/run/ospd-openvas.pid
-ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/python $GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/ospd-openvas --pid-file $GVM_INSTALL_PREFIX/var/run/ospd-openvas.pid --unix-socket=$GVM_INSTALL_PREFIX/var/run/ospd.sock --log-file $GVM_INSTALL_PREFIX/var/log/gvm/ospd-scanner.log --lock-file-dir $GVM_INSTALL_PREFIX/var/run/ospd/
-Restart=on-failure
-RestartSec=2min
-KillMode=process
-KillSignal=SIGINT
-GuessMainPID=no
+RuntimeDirectory=ospd
+RuntimeDirectoryMode=2775
+PIDFile=/run/ospd/ospd-openvas.pid
+ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/ospd-openvas --config $GVM_INSTALL_PREFIX/etc/ospd-openvas.conf
+Restart=always
+RestartSec=60
+SuccessExitStatus=SIGKILL
 PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
@@ -409,7 +393,7 @@ function set_default_scanner() {
   set -e
   . /etc/profile.d/gvm.sh
   local id="$(gvmd --get-scanners | grep -i openvas | cut -d ' ' -f1 | tr -d '\n')"
-  gvmd --modify-scanner="$id" --scanner-host="$GVM_INSTALL_PREFIX/var/run/ospd.sock"
+  gvmd --modify-scanner="$id" --scanner-host="/run/ospd/ospd-openvas.sock"
 }
 
 # This function will download the NVTs, upload the plugins to redis with openvas, and set a
@@ -430,9 +414,10 @@ function install_nvt_feeds() {
   echo "Syncing GVMD data..."
   greenbone-feed-sync --type GVMD_DATA > /dev/null
   sleep 5
-  echo "Syncing SCAP data..."
-  greenbone-feed-sync --type SCAP > /dev/null
-  sleep 5
+  ###### Re-enable for testing purposes. SCAP data takes a LONG time to download. Approximately 30-40 minutes.
+  # echo "Syncing SCAP data..."
+  # greenbone-feed-sync --type SCAP > /dev/null
+  # sleep 5
   echo "Syncing CERT data..."
   greenbone-feed-sync --type CERT > /dev/null
   sudo openvas -u
@@ -454,6 +439,9 @@ export PKG_CONFIG_PATH
 $AS_GVM "mkdir -p ~/src"
 log -i "Clone gvm repos into src directory"
 exec_as gvm clone_sources GVM_VERSION
+# Create and change owner for gvm and ospd sockets.
+$AS_ROOT "mkdir -p -m 750 /run/gvm /run/ospd"
+$AS_ROOT "chown -R gvm. /run/gvm /run/ospd"
 log -i "Install gvm-libs"
 exec_as gvm install_gvm_libs PKG_CONFIG_PATH GVM_INSTALL_PREFIX
 log -i "Install openvas-smb"
