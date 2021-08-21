@@ -219,7 +219,7 @@ function install_openvas_smb() {
   mkdir -p build
   cd build
   rm -rf *
-  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX"
+  cmake -DCMAKE_INSTALL_PREFIX="$GVM_INSTALL_PREFIX" ..
   make -j$(nproc)
   make install
 }
@@ -336,20 +336,18 @@ function create_gvmd_service() {
 Description=Open Vulnerability Assessment System Manager Daemon
 Documentation=man:gvmd(8) https://www.greenbone.net
 Wants=postgresql.service ospd-openvas.service
-After=postgresql.service ospd-openvas.service
+After=network.target networking.service postgresql.service ospd-openvas.service
 [Service]
 Type=forking
 User=gvm
 Group=gvm
 PIDFile=/run/gvm/gvmd.pid
 RuntimeDirectory=gvm
-RuntimeDirectoryMode=0750
+RuntimeDirectoryMode=2775
 PermissionStartOnly=True
-ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd.sock -c /run/gvm/gvmd.sock
-ExecReload=/bin/kill -HUP \$MAINPID
-KillMode=mixed
-Restart=on-failure
-RestartSec=2min
+ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd-openvas.sock --listen-group=gvm
+Restart=always
+TimeoutStopSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -363,23 +361,22 @@ function create_openvas_service() {
   set -e
   cat << EOF > /etc/systemd/system/ospd-openvas.service
 [Unit]
-Description=Job that runs the ospd-openvas daemon
-Documentation=man:gvm
-After=network.target networking.service redis-server@openvas.service
+Description=OSPd Wrapper for OpenVAS Scanner (ospd-openvas)
+Documentation=man:ospd-openvas(8) man:openvas(8)
 Wants=redis-server@openvas.service
+After=network.target networking.service redis-server@openvas.service
+ConditionKernelCommandLine=!recovery
 [Service]
-Environment=PATH=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin:$GVM_INSTALL_PREFIX/bin:$GVM_INSTALL_PREFIX/sbin:$GVM_INSTALL_PREFIX/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Type=forking
 User=gvm
 Group=gvm
 RuntimeDirectory=ospd
 RuntimeDirectoryMode=2775
 PIDFile=/run/ospd/ospd-openvas.pid
-ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/ospd-openvas --config $GVM_INSTALL_PREFIX/etc/ospd-openvas.conf
+ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-openvas --unix-socket /run/ospd/ospd-openvas.sock --pid-file /run/ospd/ospd-openvas.pid --log-file $GVM_INSTALL_PREFIX/var/log/gvm/ospd.log --lock-file-dir $GVM_INSTALL_PREFIX/var/lib/openvas --socket-mode 0o770
 Restart=always
 RestartSec=60
 SuccessExitStatus=SIGKILL
-PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 EOF
