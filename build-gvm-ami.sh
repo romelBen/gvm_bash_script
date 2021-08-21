@@ -354,9 +354,12 @@ After=postgresql.service ospd-openvas.service
 Type=forking
 User=gvm
 Group=gvm
-PIDFile=$GVM_INSTALL_PREFIX/var/run/gvmd.pid
+PIDFile=/run/gvm/gvmd.pid
 WorkingDirectory=$GVM_INSTALL_PREFIX
-ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=$GVM_INSTALL_PREFIX/var/run/ospd.sock -c $GVM_INSTALL_PREFIX/var/run/gvmd.sock
+ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd.sock -c /run/gvm/gvmd.sock
+RuntimeDirectory=gvm
+RuntimeDirectoryMode=0750
+PermissionsStartOnly=True
 ExecReload=/bin/kill -HUP \$MAINPID
 KillMode=mixed
 Restart=on-failure
@@ -388,8 +391,11 @@ Type=forking
 User=gvm
 Group=gvm
 WorkingDirectory=$GVM_INSTALL_PREFIX
-PIDFile=$GVM_INSTALL_PREFIX/var/run/ospd-openvas.pid
-ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/python $GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/ospd-openvas --pid-file $GVM_INSTALL_PREFIX/var/run/ospd-openvas.pid --unix-socket=$GVM_INSTALL_PREFIX/var/run/ospd.sock --log-file $GVM_INSTALL_PREFIX/var/log/gvm/ospd-scanner.log --lock-file-dir $GVM_INSTALL_PREFIX/var/run/ospd/
+PIDFile=/run/ospd/ospd-openvas.pid
+ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/python $GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/ospd-openvas --pid-file /run/ospd/ospd-openvas.pid --unix-socket=/run/ospd/ospd.sock --log-file $GVM_INSTALL_PREFIX/var/log/gvm/ospd-scanner.log --lock-file-dir /run/ospd/
+RuntimeDirectory=ospd
+RuntimeDirectoryMode=0750
+PermissionsStartOnly=True
 Restart=on-failure
 RestartSec=2min
 KillMode=process
