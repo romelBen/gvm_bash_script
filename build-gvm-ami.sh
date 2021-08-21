@@ -336,18 +336,25 @@ function create_gvmd_service() {
 Description=Open Vulnerability Assessment System Manager Daemon
 Documentation=man:gvmd(8) https://www.greenbone.net
 Wants=postgresql.service ospd-openvas.service
-After=network.target networking.service postgresql.service ospd-openvas.service
+After=postgresql.service ospd-openvas.service
 [Service]
 Type=forking
 User=gvm
 Group=gvm
 PIDFile=/run/gvm/gvmd.pid
+WorkingDirectory=$GVM_INSTALL_PREFIX
+ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd.sock -c /run/gvm/gvmd.sock
 RuntimeDirectory=gvm
-RuntimeDirectoryMode=2775
-PermissionStartOnly=True
-ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd-openvas.sock --listen-group=gvm
-Restart=always
-TimeoutStopSec=10
+RuntimeDirectoryMode=0750
+PermissionsStartOnly=True
+ExecReload=/bin/kill -HUP \$MAINPID
+KillMode=mixed
+Restart=on-failure
+RestartSec=2min
+KillMode=process
+KillSignal=SIGINT
+GuessMainPID=no
+PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -361,22 +368,27 @@ function create_openvas_service() {
   set -e
   cat << EOF > /etc/systemd/system/ospd-openvas.service
 [Unit]
-Description=OSPd Wrapper for OpenVAS Scanner (ospd-openvas)
-Documentation=man:ospd-openvas(8) man:openvas(8)
+Description=Job that runs the ospd-openvas daemon
+Documentation=man:gvm
+After=network.target redis-server@openvas.service
 Wants=redis-server@openvas.service
-After=network.target networking.service redis-server@openvas.service
-ConditionKernelCommandLine=!recovery
 [Service]
+Environment=PATH=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin:$GVM_INSTALL_PREFIX/bin:$GVM_INSTALL_PREFIX/sbin:$GVM_INSTALL_PREFIX/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Type=forking
 User=gvm
 Group=gvm
-RuntimeDirectory=ospd
-RuntimeDirectoryMode=2775
+WorkingDirectory=$GVM_INSTALL_PREFIX
 PIDFile=/run/ospd/ospd-openvas.pid
-ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-openvas --unix-socket /run/ospd/ospd-openvas.sock --pid-file /run/ospd/ospd-openvas.pid --log-file $GVM_INSTALL_PREFIX/var/log/gvm/ospd.log --lock-file-dir $GVM_INSTALL_PREFIX/var/lib/openvas --socket-mode 0o770
-Restart=always
-RestartSec=60
-SuccessExitStatus=SIGKILL
+ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/python $GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/ospd-openvas --pid-file /run/ospd/ospd-openvas.pid --unix-socket=/run/ospd/ospd.sock --log-file $GVM_INSTALL_PREFIX/var/log/gvm/ospd-scanner.log --lock-file-dir /run/ospd/
+RuntimeDirectory=ospd
+RuntimeDirectoryMode=0750
+PermissionsStartOnly=True
+Restart=on-failure
+RestartSec=2min
+KillMode=process
+KillSignal=SIGINT
+GuessMainPID=no
+PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -390,7 +402,7 @@ function set_default_scanner() {
   set -e
   . /etc/profile.d/gvm.sh
   local id="$(gvmd --get-scanners | grep -i openvas | cut -d ' ' -f1 | tr -d '\n')"
-  gvmd --modify-scanner="$id" --scanner-host="/run/ospd/ospd-openvas.sock"
+  gvmd --modify-scanner="$id" --scanner-host="/run/ospd/ospd.sock"
 }
 
 # This function will download the NVTs, upload the plugins to redis with openvas, and set a
