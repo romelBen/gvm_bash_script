@@ -58,7 +58,7 @@ trap "log -e 'Installation failed!'" ERR
 
 # Here are the environment variables that will be used in our build.
 export DEBIAN_FRONTEND=noninteractive
-export AS_ROOT="sudo bash -c"
+export AS_ROOT="bash -c"
 export AS_GVM="sudo -u gvm bash -c"
 
 export GVM_INSTALL_PREFIX="/opt/gvm"
@@ -303,7 +303,7 @@ function setup_gvmd() {
   gvm-manage-certs -af
   gvmd --get-users | grep admin || gvmd --create-user=admin --password="$GVM_ADMIN_PWD"
   # set feed owner
-  local admin_id="$(gvmd --get-users --verbose | grep admin | cut -d ' ' -f2 | tr -d '\n')"
+  local admin_id="$(gvmd --get-users --verbose | grep admin | awk '{print $2}')"
   gvmd --modify-setting 78eceaec-3385-11ea-b237-28d24461215b --value "$admin_id"
 }
 
@@ -336,24 +336,18 @@ function create_gvmd_service() {
 Description=Open Vulnerability Assessment System Manager Daemon
 Documentation=man:gvmd(8) https://www.greenbone.net
 Wants=postgresql.service ospd-openvas.service
-After=postgresql.service ospd-openvas.service
+After=postgresql.service ospd-openvas.service network.target networking.service
 [Service]
 Type=forking
 User=gvm
 Group=gvm
 PIDFile=/run/gvm/gvmd.pid
-WorkingDirectory=$GVM_INSTALL_PREFIX
-ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd.sock -c /run/gvm/gvmd.sock
 RuntimeDirectory=gvm
-RuntimeDirectoryMode=0750
-PermissionsStartOnly=True
-ExecReload=/bin/kill -HUP \$MAINPID
-KillMode=mixed
-Restart=on-failure
-RestartSec=2min
-KillMode=process
-KillSignal=SIGINT
-GuessMainPID=no
+RuntimeDirectoryMode=2775
+EnvironmentFile=$GVM_INSTALL_PREFIX/etc/default/gvmd
+ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd-openvas.sock -c /run/gvm/gvmd.sock --listen-group=gvm
+Restart=always
+TimeoutStopSec=10
 PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
@@ -366,28 +360,30 @@ EOF
 # This function will create the systemd openvas service which will connect to the redis-server.
 function create_openvas_service() {
   set -e
+  cat << EOF > $GVM_INSTALL_PREFIX/etc/ospd-openvas.conf
+[OSPD - openvas]
+log_level = INFO
+socket_mode = 0o770
+unix_socket = /run/ospd/ospd-openvas.sock
+pid_file = /run/ospd/ospd-openvas.pid
+log_file = $GVM_INSTALL_PREFIX/var/log/gvm/ospd-openvas.log
+lock_file_dir = $GVM_INSTALL_PREFIX/var/lib/openvas
+EOF
   cat << EOF > /etc/systemd/system/ospd-openvas.service
 [Unit]
 Description=Job that runs the ospd-openvas daemon
 Documentation=man:gvm
-After=network.target redis-server@openvas.service
+After=network.target networking.service redis-server@openvas.service
 Wants=redis-server@openvas.service
 [Service]
 Environment=PATH=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin:$GVM_INSTALL_PREFIX/bin:$GVM_INSTALL_PREFIX/sbin:$GVM_INSTALL_PREFIX/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Type=forking
 User=gvm
 Group=gvm
-WorkingDirectory=$GVM_INSTALL_PREFIX
-PIDFile=/run/ospd/ospd-openvas.pid
-ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/python $GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/ospd-openvas --pid-file /run/ospd/ospd-openvas.pid --unix-socket=/run/ospd/ospd.sock --log-file $GVM_INSTALL_PREFIX/var/log/gvm/ospd-scanner.log --lock-file-dir /run/ospd/
 RuntimeDirectory=ospd
-RuntimeDirectoryMode=0750
-PermissionsStartOnly=True
-Restart=on-failure
-RestartSec=2min
-KillMode=process
-KillSignal=SIGINT
-GuessMainPID=no
+RuntimeDirectoryMode=2775
+PIDFile=/run/ospd/ospd-openvas.pid
+ExecStart=$GVM_INSTALL_PREFIX/bin/ospd-scanner/bin/ospd-openvas --config $GVM_INSTALL_PREFIX/etc/ospd-openvas.conf
 PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
@@ -402,7 +398,7 @@ function set_default_scanner() {
   set -e
   . /etc/profile.d/gvm.sh
   local id="$(gvmd --get-scanners | grep -i openvas | cut -d ' ' -f1 | tr -d '\n')"
-  gvmd --modify-scanner="$id" --scanner-host="/run/ospd/ospd.sock"
+  gvmd --modify-scanner="$id" --scanner-host="/run/ospd/ospd-openvas.sock"
 }
 
 # This function will download the NVTs, upload the plugins to redis with openvas, and set a
@@ -473,9 +469,10 @@ log -i "Install ospd-openvas"
 exec_as gvm install_ospd_openvas PKG_CONFIG_PATH GVM_INSTALL_PREFIX
 log -i "Install gvm-tools"
 exec_as gvm install_gvm_tools
-log -i "Create GVM services"
-exec_as root create_gvmd_service GVM_INSTALL_PREFIX
+log -i "Setup OpenVAS services"
 exec_as root create_openvas_service GVM_INSTALL_PREFIX
+log -i "Setup GVMd services"
+exec_as root create_gvmd_service GVM_INSTALL_PREFIX
 log -i "Set OpenVAS default scanner"
 exec_as gvm set_default_scanner GVM_INSTALL_PREFIX
 log -i "Initiate download of NVTs, GVMD, SCAP, and CERT data into AMI. (This will take 40-50 minutes to complete.)"
