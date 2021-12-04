@@ -48,7 +48,7 @@ function exec_as() {
   local fn="$2"
   shift; shift
   local env=()
-  for e in $@; do
+  for e in "$@"; do
       env+=( "$e=${!e}" )
   done
   sudo "${env[@]}" -u "$user" bash -c "$(declare -f $fn); $fn"
@@ -62,7 +62,7 @@ export AS_ROOT="bash -c"
 export AS_GVM="sudo -u gvm bash -c"
 
 export GVM_INSTALL_PREFIX="/opt/gvm"
-export GVM_VERSION="21.04"
+export GVM_VERSION="stable"
 export GVM_ADMIN_PWD="admin"
 
 require GVM_INSTALL_PREFIX
@@ -167,20 +167,20 @@ EOF
 # This function will send git clones of gvm-libs, openvas, ospd, ospd-openvas, and gvmd to
 # directory ~/src.
 function clone_sources() {
-  set -e
-  cd ~/src
-  git clone -b "gvm-libs-$GVM_VERSION" https://github.com/greenbone/gvm-libs.git \
-    || (cd gvm-libs; git pull --all; git checkout "gvm-libs-$GVM_VERSION"; git pull; cd ..)
-  git clone -b "openvas-$GVM_VERSION" https://github.com/greenbone/openvas.git \
-    || (cd openvas; git pull --all; git checkout "openvas-$GVM_VERSION"; git pull; cd ..)
-  git clone -b master --single-branch https://github.com/greenbone/openvas-smb.git \
-    || (cd openvas-smb; git pull; cd ..)
-  git clone -b "gvmd-$GVM_VERSION" https://github.com/greenbone/gvmd.git \
-    || (cd gvmd; git pull --all; git checkout "gvmd-$GVM_VERSION"; git pull; cd ..)
-  git clone -b "ospd-openvas-$GVM_VERSION" https://github.com/greenbone/ospd-openvas.git \
-    || (cd ospd-openvas; git pull --all; git checkout "ospd-openvas-$GVM_VERSION"; git pull; cd ..)
-  git clone -b "ospd-$GVM_VERSION" https://github.com/greenbone/ospd.git \
-    || (cd ospd; git pull --all; git checkout "ospd-$GVM_VERSION"; git pull; cd ..)
+    set -e
+    cd ~/src
+    git clone -b "$GVM_VERSION" https://github.com/greenbone/gvm-libs.git \
+        || (cd gvm-libs; git pull --all; git checkout "$GVM_VERSION"; git pull; cd ..)
+    git clone -b "$GVM_VERSION" https://github.com/greenbone/openvas.git \
+        || (cd openvas; git pull --all; git checkout "$GVM_VERSION"; git pull; cd ..)
+    git clone -b main --single-branch https://github.com/greenbone/openvas-smb.git \
+        || (cd openvas-smb; git pull; cd ..)
+    git clone -b "$GVM_VERSION" https://github.com/greenbone/gvmd.git \
+        || (cd gvmd; git pull --all; git checkout "$GVM_VERSION"; git pull; cd ..)
+    git clone -b "$GVM_VERSION" https://github.com/greenbone/ospd-openvas.git \
+        || (cd ospd-openvas; git pull --all; git checkout "$GVM_VERSION"; git pull; cd ..)
+    git clone -b "$GVM_VERSION" https://github.com/greenbone/ospd.git \
+        || (cd ospd; git pull --all; git checkout "$GVM_VERSION"; git pull; cd ..)
 } 
 
 # # This function will use download the tar files to extract and confirm with the gpg key if the signature is correct.
@@ -207,7 +207,6 @@ function install_gvm_libs() {
         -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX/var" \
         -DSYSCONFDIR="$GVM_INSTALL_PREFIX/etc" ..
   make -j$(nproc)
-  make doc
   make install
 }
 
@@ -236,7 +235,6 @@ function install_openvas() {
         -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX/var" \
         -DSYSCONFDIR="$GVM_INSTALL_PREFIX/etc" ..
   make -j$(nproc)
-  make doc
   make install
 }
 
@@ -276,7 +274,6 @@ function install_gvmd() {
         -DLOCALSTATEDIR="$GVM_INSTALL_PREFIX/var" \
         -DSYSCONFDIR="$GVM_INSTALL_PREFIX/etc" ..
   make -j$(nproc)
-  make doc
   make install
 }
 
@@ -341,11 +338,11 @@ After=postgresql.service ospd-openvas.service network.target networking.service
 Type=forking
 User=gvm
 Group=gvm
-PIDFile=/run/gvm/gvmd.pid
-RuntimeDirectory=gvm
+PIDFile=/run/gvmd/gvmd.pid
+RuntimeDirectory=gvmd
 RuntimeDirectoryMode=2775
 EnvironmentFile=$GVM_INSTALL_PREFIX/etc/default/gvmd
-ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd-openvas.sock -c /run/gvm/gvmd.sock --listen-group=gvm
+ExecStart=$GVM_INSTALL_PREFIX/sbin/gvmd --osp-vt-update=/run/ospd/ospd-openvas.sock -c /run/gvmd/gvmd.sock --listen-group=gvm
 Restart=always
 TimeoutStopSec=10
 PrivateTmp=true
@@ -445,12 +442,12 @@ $AS_GVM "mkdir -p ~/src"
 log -i "Clone gvm repos into src directory"
 exec_as gvm clone_sources GVM_VERSION
 # Create and change owner for gvm and ospd sockets.
-$AS_ROOT "mkdir -p -m 750 /run/gvm /run/ospd"
-$AS_ROOT "chown -R gvm. /run/gvm /run/ospd"
+$AS_ROOT "mkdir -p -m 750 /run/gvm /run/ospd /run/gvmd"
+$AS_ROOT "chown -R gvm. /run/gvm /run/ospd /run/gvmd"
 log -i "Install gvm-libs"
 exec_as gvm install_gvm_libs PKG_CONFIG_PATH GVM_INSTALL_PREFIX
-log -i "Install openvas-smb"
-exec_as gvm install_openvas_smb PKG_CONFIG_PATH GVM_INSTALL_PREFIX
+# log -i "Install openvas-smb"
+# exec_as gvm install_openvas_smb PKG_CONFIG_PATH GVM_INSTALL_PREFIX
 log -i "Install openvas"
 exec_as gvm install_openvas PKG_CONFIG_PATH GVM_INSTALL_PREFIX
 # Make ourselves root starting here.
